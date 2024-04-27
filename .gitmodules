@@ -1,3 +1,6 @@
 [submodule "components/ubxlib"]
 	path = components/ubxlib
 	url = https://github.com/u-blox/ubxlib.git
+[submodule "components/doomgeneric"]
+	path = components/doomgeneric
+	url = https://github.com/adfelippe/doomgeneric.git
