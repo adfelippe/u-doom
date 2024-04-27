@@ -1,0 +1,3 @@
+[submodule "components/ubxlib"]
+	path = components/ubxlib
+	url = https://github.com/u-blox/ubxlib.git
