@@ -35,39 +35,23 @@ static uDeviceType_t gDeviceType = U_DEVICE_TYPE_SHORT_RANGE;
 static const uNetworkCfgBle_t gNetworkCfg = {
     .type = U_NETWORK_TYPE_BLE,
     .role = U_BLE_CFG_ROLE_PERIPHERAL,
-    .spsServer = true
+    .spsServer = false
 };
 static uDeviceCfg_t gDeviceCfg;
+static volatile bool gIsConnected = false;
+static uint16_t gCharHandle = -1;
+static int32_t gConnHandle = -1;
 
-static void connectionCallback(int32_t connHandle, char *address, int32_t status,
-                               int32_t channel, int32_t mtu, void *pParameters)
+static void gapConnectionCallback(int32_t connHandle, char *pAddress, bool connected)
 {
-    if (status == (int32_t)U_BLE_SPS_CONNECTED) {
-        printf("Connected to: %s\n", address);
-    } else if (status == (int32_t)U_BLE_SPS_DISCONNECTED) {
-        if (connHandle != U_BLE_SPS_INVALID_HANDLE) {
-            printf("Diconnected\n");
-        } else {
-            printf("* Connection attempt failed\n");
-        }
+    gIsConnected = connected;
+    gConnHandle = connHandle;
+
+    if (connected) {
+        printf("GAP connected to: %s\n", pAddress);
+    } else {
+        printf("GAP disconnected\n");
     }
-}
-
-static void dataAvailableCallback(int32_t channel, void *pParameters)
-{
-    char buffer[100] = {0};
-    int32_t length;
-    uDeviceHandle_t *pDeviceHandle = (uDeviceHandle_t *)pParameters;
-    printf("dataAvailableCallback\n");
-    do {
-        length = uBleSpsReceive(*pDeviceHandle, channel, buffer, sizeof(buffer) - 1);
-        if (length > 0) {
-            buffer[length] = 0;
-            printf("Received: %s\n", buffer);
-            // Echo the received data
-            uBleSpsSend(*pDeviceHandle, channel, buffer, length);
-        }
-    } while (length > 0);
 }
 
 void main()
@@ -91,13 +75,18 @@ void main()
         errorCode = uNetworkInterfaceUp(deviceHandle, gNetworkCfg.type, &gNetworkCfg);
 
         if (errorCode == 0) {
-            uBleSpsSetCallbackConnectionStatus(deviceHandle, connectionCallback, &deviceHandle);
-            uBleSpsSetDataAvailableCallback(deviceHandle, dataAvailableCallback, &deviceHandle);
+            uBleGapSetConnectCallback(deviceHandle, gapConnectionCallback);
+            uBleGattBeginAddService(deviceHandle, "2456e1b926e28f83e744f34f01e9d701");
+            uBleGattAddCharacteristic(deviceHandle, "2456e1b926e28f83e744f34f01e9d703", 0x10, &gCharHandle);
+            uBleGattEndAddService(deviceHandle);
 
             printf("\n== Start a SPS client e.g. in a phone ==\n\n");
             printf("Waiting for connections...\n");
             while (1) {
-                uPortTaskBlock(1000);
+                uPortTaskBlock(2000);
+                if (gIsConnected) {
+                    uBleGattWriteNotifyValue(deviceHandle, gConnHandle, gCharHandle, "HEY!", 4);
+                }
             }
         } else {
             printf("* Failed to bring up the network: %d\n", errorCode);
