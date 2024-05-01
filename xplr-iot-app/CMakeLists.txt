@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.4)
-set(APP_NAME ubxlib_app)
+cmake_minimum_required(VERSION 3.20)
+set(APP_NAME u-doom-xplr-iot-app)
 project(${APP_NAME})
 string(TOLOWER  ${CMAKE_SYSTEM_NAME} OS_NAME)
 
