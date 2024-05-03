@@ -9,6 +9,42 @@
 
 <script>
 
+const VideoDisplay = (() => {
+    const IMAGE_WIDTH = 640;
+    const IMAGE_HEIGTH = 400;
+    const CANVAS_ID = 'video-canvas';
+    let ctx = null;
+
+    createCanvas = () => {
+        const canvas = document.createElement('canvas');
+        canvas.id = CANVAS_ID;
+        canvas.width = IMAGE_WIDTH;
+        canvas.height = IMAGE_HEIGTH;
+        ctx = canvas.getContext("2d");
+        document.body.appendChild(canvas);
+        return canvas;
+    };
+
+    drawImage = (bytearray) => {
+        // Initialize a new ImageData object
+        let imageData = new ImageData(bytearray, IMAGE_WIDTH, IMAGE_HEIGTH);
+
+        // Draw image data to the canvas
+        ctx.putImageData(imageData, 0, 0);
+    };
+
+    initialize = () => {
+        createCanvas();
+    };
+
+    return {
+        initialize,
+        drawImage
+    }
+
+})();
+
+
 const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
 const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
 const NINA_NAME = "NINA-W1-B9E61A"
@@ -16,6 +52,8 @@ window.device;
 
 function handleCharacteristicValueChanged(event) {
   const value = event.target.value;
+  VideoDisplay.drawImage(value);
+
   let decoder = new TextDecoder("utf-8");
   let str = decoder.decode(value);
   console.log('Received ' + str);
@@ -63,8 +101,30 @@ const init = () => {
     document.querySelector('#connect').addEventListener('click', scan);
 	document.querySelector('#disconnect').addEventListener('click', disconnect);
     statusElement = document.querySelector('#status');
+    // add canvas in the document.body, later we can review the position and move to the html
+    VideoDisplay.initialize();
 }
 
 window.addEventListener('load', init);
+
+// register key listener
+document.onkeydown = (e) => {
+    e = e || window.event;
+
+    if (e.keyCode === 38) {
+        console.log('↑');
+    } else if (e.keyCode === 40) {
+        console.log('↓');
+    } else if (e.keyCode === 37) {
+        console.log('←');
+    } else if (e.keyCode === 39) {
+        console.log('→');
+    } else if (e.ctrlKey) {
+        console.log('Ctrl');
+    } else if (e.keyCode === 13) {
+        console.log('Enter');
+    }
+
+}
 
 </script>
