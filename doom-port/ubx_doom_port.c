@@ -8,6 +8,11 @@
 #include "doomgeneric.h"
 
 #define DOOM_FRAME_SIZE     (DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4)
+#define SINGLE_PACKET_SIZE  200
+#define PACKETS_TO_SEND     (DOOM_FRAME_SIZE / SINGLE_PACKET_SIZE)
+
+const char gStartOfFrame[] = {0xCA, 0xFE, 0xBA, 0xBE};
+const char gEndOfFrame[] = {0xDE, 0xAD, 0xBE, 0xEF};
 
 static uDeviceType_t gDeviceType = U_DEVICE_TYPE_SHORT_RANGE;
 static const uNetworkCfgBle_t gNetworkCfg = {
@@ -21,6 +26,7 @@ static uint16_t gCharHandle = -1;
 static int32_t gSpsChannel = -1;
 static int32_t gMtuSize = 0;
 uDeviceHandle_t gDeviceHandle;
+
 
 static void connectionCallback(int32_t connHandle, char *address, int32_t status,
                                int32_t channel, int32_t mtu, void *pParameters)
@@ -74,10 +80,11 @@ void DG_Init()
 void DG_DrawFrame()
 {
     if (gIsConnected) {
-        int32_t errorCode = uBleSpsSend(gDeviceHandle, gSpsChannel, (const char*)DG_ScreenBuffer, DOOM_FRAME_SIZE);
-        if (errorCode != 0) {
-            printf("Failed to send SPS data, error (%d)\n", errorCode);
+        uBleSpsSend(gDeviceHandle, gSpsChannel, gStartOfFrame, sizeof(gStartOfFrame));
+        for (uint32_t i = 0; i < PACKETS_TO_SEND; i += SINGLE_PACKET_SIZE) {
+            uBleSpsSend(gDeviceHandle, gSpsChannel, (const char*)&DG_ScreenBuffer[i], SINGLE_PACKET_SIZE);
         }
+        uBleSpsSend(gDeviceHandle, gSpsChannel, gEndOfFrame, sizeof(gEndOfFrame));
     }
 }
 
