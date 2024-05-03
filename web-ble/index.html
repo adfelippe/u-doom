@@ -9,9 +9,10 @@
 
 <script>
 
+const IMAGE_WIDTH = 640;
+const IMAGE_HEIGTH = 400;
+
 const VideoDisplay = (() => {
-    const IMAGE_WIDTH = 640;
-    const IMAGE_HEIGTH = 400;
     const CANVAS_ID = 'video-canvas';
     let ctx = null;
 
@@ -27,10 +28,14 @@ const VideoDisplay = (() => {
 
     drawImage = (bytearray) => {
         // Initialize a new ImageData object
-        let imageData = new ImageData(bytearray, IMAGE_WIDTH, IMAGE_HEIGTH);
-
+		let imageArray = new Uint8ClampedArray(bytearray)
+        let imageData = new ImageData(imageArray, IMAGE_WIDTH, IMAGE_HEIGTH);
         // Draw image data to the canvas
         ctx.putImageData(imageData, 0, 0);
+		console.log('Image data length: ' + bytearray.byteLength);
+		//let decoder = new TextDecoder("utf-8");
+		//let str = decoder.decode(value);
+		//console.log('Image data: ' + str);
     };
 
     initialize = () => {
@@ -47,16 +52,54 @@ const VideoDisplay = (() => {
 
 const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
 const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
-const NINA_NAME = "NINA-W1-B9E61A"
+const NINA_NAME = "NINA-W1-B9E61A";
+const SINGLE_PACKET_SIZE = 200;
 window.device;
+let imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * 4);
+const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
+const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
+let frameOffset = 0;
+let frameTransmission = false;
+
+function compareArray4Bytes(a1, a2) {
+	if (a1.getUint8(0) == a2[0] &&
+		a1.getUint8(1) == a2[1] &&
+		a1.getUint8(2) == a2[2] &&
+		a1.getUint8(3) == a2[3]) {
+		return true;
+	}
+	
+	return false;
+}
 
 function handleCharacteristicValueChanged(event) {
-  const value = event.target.value;
-  VideoDisplay.drawImage(value);
-
-  let decoder = new TextDecoder("utf-8");
-  let str = decoder.decode(value);
-  console.log('Received ' + str);
+	const value = event.target.value;
+  
+	// Probably start or end of frame
+	if (value.buffer.byteLength == 4) {
+		if (compareArray4Bytes(value, startOfFrame) == true) {
+		console.log('startOfFrame'); 
+		frameTransmission = true;
+		} else if (compareArray4Bytes(value, endOfFrame) == true) {
+			frameTransmission = false;
+			frameOffset = 0;
+			VideoDisplay.drawImage(imageByteArray);
+			console.log('endOfFrame'); 
+		} else {
+			console.log("Size 4, but neither SOF nor EOF: 0x" + 
+						value.getUint8(0).toString(16) + " 0x" + 
+						value.getUint8(1).toString(16) + " 0x" +
+						value.getUint8(2).toString(16) + " 0x" +
+						value.getUint8(3).toString(16));
+		}
+	}
+	
+	if (value.buffer.byteLength == SINGLE_PACKET_SIZE && frameTransmission == true) {
+		for (let i = 0; i < SINGLE_PACKET_SIZE; i++) {
+			imageByteArray[frameOffset + i] = value.getUint8(i);
+		}
+		frameOffset += SINGLE_PACKET_SIZE;
+	}
 }
 
 const openDevice = async (device) => {
@@ -66,9 +109,7 @@ const openDevice = async (device) => {
         const service = await server.getPrimaryService(NINA_SPS_SERVICE);
 		const characteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
 		characteristic.startNotifications();
-		characteristic.addEventListener('characteristicvaluechanged',
-										handleCharacteristicValueChanged);
-
+		characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
         console.log('Connected to device', device);
         statusElement.innerHTML = `Connected to ${device.name}`
 
