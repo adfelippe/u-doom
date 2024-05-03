@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+    <h1>u-doom</h1>
+	<h2>Streaming Doom over BLE to a WebBluetooth application</h2>
+    <h3 id="status">Not Connected</h3>
+    <button id="connect">CONNECT</button>
+	<button id="disconnect">DISCONNECT</button>
+</html>
+
+<script>
+
+const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
+const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
+const NINA_NAME = "NINA-W1-B9E61A"
+window.device;
+
+function handleCharacteristicValueChanged(event) {
+  const value = event.target.value;
+  let decoder = new TextDecoder("utf-8");
+  let str = decoder.decode(value);
+  console.log('Received ' + str);
+}
+
+const openDevice = async (device) => {
+    const server = await device.gatt.connect();
+    
+    try {
+        const service = await server.getPrimaryService(NINA_SPS_SERVICE);
+		const characteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
+		characteristic.startNotifications();
+		characteristic.addEventListener('characteristicvaluechanged',
+										handleCharacteristicValueChanged);
+
+        console.log('Connected to device', device);
+        statusElement.innerHTML = `Connected to ${device.name}`
+
+        device.ongattserverdisconnected = _ => {
+            console.log(`Disconnected ${device.id}`);
+            statusElement.innerHTML = "Not Connected";
+        };
+    } catch (err) {
+        console.warn(err);
+    }
+}
+
+const scan = async () => {
+    try {
+        device = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [NINA_SPS_SERVICE] }]
+        });
+
+        await openDevice(device);
+    } catch (err) {
+        // ignore if we didn't get a device
+    }
+}
+
+const disconnect = async () => {
+	await device.gatt.disconnect();
+}
+
+const init = () => {
+    document.querySelector('#connect').addEventListener('click', scan);
+	document.querySelector('#disconnect').addEventListener('click', disconnect);
+    statusElement = document.querySelector('#status');
+}
+
+window.addEventListener('load', init);
+
+</script>
