@@ -10,7 +10,7 @@
     <link href="css/style.css" rel="stylesheet">
 </head>
 <body>
-    <header>
+    <header class="grow-w">
         <div>
             <div class="container">
                 <div class="row">
@@ -27,24 +27,37 @@
             </div>
         </div>
     </header>
-    <main class="container">
+    <main class="container grow-w">
         <div class="row">
-            <div class="col-9" id="doom-panel ">
-                </div class="row">
-                    <canvas id="video-canvas"></canvas>
-                </div>
+            <div class="col text-center">
+                Receiving data
             </div>
-            <div class="col-3" id="doom-feedback"></div>
+            <div class="col text-center">
+                Sending data
+            </div>
         </div>
         <div class="row">
-            <div class="col" id="ble-panel">
-                <h3 id="status">Not Connected</h3>
-                <button id="connect">CONNECT</button>
-                <button id="disconnect">DISCONNECT</button>
+            <div class="col" id="doom-panel">
+                <canvas id="video-canvas"></canvas>
+                <div id="status-panel">
+                    <div id="status-icon"></div>
+                    <div id="status">Not Connected</div>
+                </div>
+            </div>
+            <div class="col" id="doom-feedback-panel">
+                <textarea id="feedback" readonly></textarea>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col" id="doom-action-panel">
+                <div class="col" id="ble-panel">
+                    <button id="connect" class="btn btn-success">CONNECT</button>
+                    <button id="disconnect" class="btn btn-danger">DISCONNECT</button>
+                </div>
             </div>
         </div>
     </main>
-    <footer class="row dark-panel">
+    <footer class="row dark-panel grow-w">
         <div class="col">
         </div>
     </footer>
