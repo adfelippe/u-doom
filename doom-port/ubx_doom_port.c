@@ -7,7 +7,7 @@
 #include "doomkeys.h"
 #include "doomgeneric.h"
 
-#define DOOM_FRAME_SIZE     (DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4)
+#define DOOM_FRAME_SIZE     (DOOMGENERIC_RESX * DOOMGENERIC_RESY * sizeof(uint32_t))
 #define SINGLE_PACKET_SIZE  200
 #define PACKETS_TO_SEND     (DOOM_FRAME_SIZE / SINGLE_PACKET_SIZE)
 
@@ -31,7 +31,6 @@ uDeviceHandle_t gDeviceHandle;
 static void connectionCallback(int32_t connHandle, char *address, int32_t status,
                                int32_t channel, int32_t mtu, void *pParameters)
 {
-    printf("connectionCallback\n");
     if (status == (int32_t)U_BLE_SPS_CONNECTED) {
         printf("Connected to: %s, channel: %d, mtu: %d\n", address, channel, mtu);
         gIsConnected = true;
@@ -80,9 +79,12 @@ void DG_Init()
 void DG_DrawFrame()
 {
     if (gIsConnected) {
+        uint8_t *pScreenBuffer = (uint8_t *)DG_ScreenBuffer;
+        uint32_t offset = 0;
         uBleSpsSend(gDeviceHandle, gSpsChannel, gStartOfFrame, sizeof(gStartOfFrame));
-        for (uint32_t i = 0; i < PACKETS_TO_SEND; i += SINGLE_PACKET_SIZE) {
-            uBleSpsSend(gDeviceHandle, gSpsChannel, (const char*)&DG_ScreenBuffer[i], SINGLE_PACKET_SIZE);
+        for (uint32_t i = 0; i < PACKETS_TO_SEND; ++i) {
+            uBleSpsSend(gDeviceHandle, gSpsChannel, &pScreenBuffer[offset], SINGLE_PACKET_SIZE);
+            offset += SINGLE_PACKET_SIZE;
         }
         uBleSpsSend(gDeviceHandle, gSpsChannel, gEndOfFrame, sizeof(gEndOfFrame));
     }
@@ -115,7 +117,6 @@ void DG_SetWindowTitle(const char * title)
 
 int main(int argc, char **argv)
 {
-    printf("Starting u-doom, a u-blox doom port via BLE streaming\n");
     doomgeneric_Create(argc, argv);
 
     for (;;) {
