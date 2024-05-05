@@ -55,7 +55,7 @@ header #subtitle {
     width: 9em;
     height: 2em;
     position: absolute;
-    right: calc(4rem + 2px);
+    right: calc(6rem + 7px);
     bottom: 7px;
     padding: 5px;
     background: #ddd;
@@ -70,7 +70,7 @@ header #subtitle {
     display: inline-block;
 }
 
-#status {
+#status-text {
     display: inline-block;
 }
 

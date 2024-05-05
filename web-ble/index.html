@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>u-doom: Streaming Doom over BLE to a WebBluetooth application</title>
     <link rel="icon" type="image/png" href="images/favicon.ico">
-    <link rel="manifest" href="images/site.webmanifest">
     <link rel="stylesheet" href="css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     <link href="css/style.css" rel="stylesheet">
 </head>
@@ -41,7 +40,7 @@
                 <canvas id="video-canvas"></canvas>
                 <div id="status-panel">
                     <div id="status-icon"></div>
-                    <div id="status">Not Connected</div>
+                    <div id="status-text">Not Connected</div>
                 </div>
             </div>
             <div class="col" id="doom-feedback-panel">
@@ -70,11 +69,11 @@
 const IMAGE_WIDTH = 640;
 const IMAGE_HEIGTH = 400;
 
-const VideoDisplay = (() => {
+const DoomPanel = (() => {
     const CANVAS_ID = 'video-canvas';
     let ctx = null;
 
-    loadContext = () => {
+    initialize = () => {
         const canvas = document.getElementById(CANVAS_ID);
         ctx = canvas.getContext("2d");
     };
@@ -97,10 +96,6 @@ const VideoDisplay = (() => {
 		//				bytearray[3].toString(16));
     };
 
-    initialize = () => {
-        loadContext();
-    };
-
     return {
         initialize,
         drawImage
@@ -108,6 +103,35 @@ const VideoDisplay = (() => {
 
 })();
 
+const StatusPanel = (() => {
+    const STATUS_PANEL = 'status-panel';
+    const STATUS_TEXT = 'status-text';
+    const STATUS_ICON = 'status-icon';
+    let statusText = null;
+    let statusIcon = null;
+
+    const initialize = () => {
+        const statusPanel = document.getElementById(STATUS_PANEL);
+        statusText = statusPanel.querySelector(`#${STATUS_TEXT}`);
+        statusIcon = statusPanel.querySelector(`#${STATUS_ICON}`);
+    };
+
+    const connect = () => {
+        statusText.innerHTML = 'Connected';
+        statusIcon.classList.add("connected");
+    };
+
+    const disconnect = () => {
+        statusText.innerHTML = 'Not Connected';
+        statusIcon.classList.remove("connected");
+    };
+
+    return {
+        initialize,
+        connect,
+        disconnect
+    }
+})();
 
 const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
 const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
@@ -144,7 +168,7 @@ function handleCharacteristicValueChanged(event) {
 		} else if (compareArray4Bytes(value, endOfFrame) == true) {
 			frameTransmission = false;
 			frameOffset = 0;
-			VideoDisplay.drawImage(imageByteArray);
+			DoomPanel.drawImage(imageByteArray);
 			console.log('endOfFrame'); 
 			console.log('numberOfPackets = ', numberOfPackets); 
 			numberOfPackets = 0;
@@ -178,11 +202,13 @@ const openDevice = async (device) => {
 		characteristic.startNotifications();
 		characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
         console.log('Connected to device', device);
-        statusElement.innerHTML = `Connected to ${device.name}`
+        //statusElement.innerHTML = `Connected to ${device.name}`
+        StatusPanel.connect();
 
         device.ongattserverdisconnected = _ => {
             console.log(`Disconnected ${device.id}`);
-            statusElement.innerHTML = "Not Connected";
+            //statusElement.innerHTML = "Not Connected";
+            StatusPanel.disconnect();
         };
     } catch (err) {
         console.warn(err);
@@ -208,9 +234,10 @@ const disconnect = async () => {
 const init = () => {
     document.querySelector('#connect').addEventListener('click', scan);
 	document.querySelector('#disconnect').addEventListener('click', disconnect);
-    statusElement = document.querySelector('#status');
-    // add canvas in the doom-panel, later we can review the position and move to the html
-    VideoDisplay.initialize('doom-panel');
+    // initialize status-panel
+    StatusPanel.initialize();
+    // initialize doom-panel
+    DoomPanel.initialize();
 }
 
 window.addEventListener('load', init);
