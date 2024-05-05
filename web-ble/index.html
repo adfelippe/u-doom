@@ -1,11 +1,69 @@
 <!DOCTYPE html>
-<html>
-    <h1>u-doom</h1>
-	<h2>Streaming Doom over BLE to a WebBluetooth application</h2>
-    <h3 id="status">Not Connected</h3>
-    <button id="connect">CONNECT</button>
-	<button id="disconnect">DISCONNECT</button>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>u-doom: Streaming Doom over BLE to a WebBluetooth application</title>
+    <link rel="icon" type="image/png" href="images/favicon.ico">
+    <link rel="manifest" href="images/site.webmanifest">
+    <link rel="stylesheet" href="css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <header class="grow-w">
+        <div>
+            <div class="container">
+                <div class="row">
+                    <div class="col-2"><img id="logo" class="padding" src="images/logo.png" alt="logo image"></div>
+                    <div class="col-10" id="title">u-doom</div>
+                </div>
+            </div>
+            <div id="subtitle" class="dark-panel">
+                <div class="container">
+                    <div class="row">
+                        Streaming Doom over BLE to a WebBluetooth application
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main class="container grow-w">
+        <div class="row">
+            <div class="col text-center">
+                Receiving data
+            </div>
+            <div class="col text-center">
+                Sending data
+            </div>
+        </div>
+        <div class="row">
+            <div class="col" id="doom-panel">
+                <canvas id="video-canvas"></canvas>
+                <div id="status-panel">
+                    <div id="status-icon"></div>
+                    <div id="status">Not Connected</div>
+                </div>
+            </div>
+            <div class="col" id="doom-feedback-panel">
+                <textarea id="feedback" readonly></textarea>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col" id="doom-action-panel">
+                <div class="col" id="ble-panel">
+                    <button id="connect" class="btn btn-success">CONNECT</button>
+                    <button id="disconnect" class="btn btn-danger">DISCONNECT</button>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer class="row dark-panel grow-w">
+        <div class="col">
+        </div>
+    </footer>
+</body>
 </html>
+<!DOCTYPE html>
 
 <script>
 
@@ -16,14 +74,9 @@ const VideoDisplay = (() => {
     const CANVAS_ID = 'video-canvas';
     let ctx = null;
 
-    createCanvas = () => {
-        const canvas = document.createElement('canvas');
-        canvas.id = CANVAS_ID;
-        canvas.width = IMAGE_WIDTH;
-        canvas.height = IMAGE_HEIGTH;
+    loadContext = () => {
+        const canvas = document.getElementById(CANVAS_ID);
         ctx = canvas.getContext("2d");
-        document.body.appendChild(canvas);
-        return canvas;
     };
 
     drawImage = (bytearray) => {
@@ -39,7 +92,7 @@ const VideoDisplay = (() => {
     };
 
     initialize = () => {
-        createCanvas();
+        loadContext();
     };
 
     return {
@@ -142,8 +195,8 @@ const init = () => {
     document.querySelector('#connect').addEventListener('click', scan);
 	document.querySelector('#disconnect').addEventListener('click', disconnect);
     statusElement = document.querySelector('#status');
-    // add canvas in the document.body, later we can review the position and move to the html
-    VideoDisplay.initialize();
+    // add canvas in the doom-panel, later we can review the position and move to the html
+    VideoDisplay.initialize('doom-panel');
 }
 
 window.addEventListener('load', init);
