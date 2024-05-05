@@ -85,10 +85,16 @@ const VideoDisplay = (() => {
         let imageData = new ImageData(imageArray, IMAGE_WIDTH, IMAGE_HEIGTH);
         // Draw image data to the canvas
         ctx.putImageData(imageData, 0, 0);
-		console.log('Image data length: ' + bytearray.byteLength);
+		console.log('bytearray length: ' + bytearray.byteLength);
+		console.log('imageArray length: ' + imageArray.byteLength);
 		//let decoder = new TextDecoder("utf-8");
 		//let str = decoder.decode(value);
 		//console.log('Image data: ' + str);
+		//console.log("First RGBA: " + 
+		//				bytearray[0].toString(16) + " 0x" + 
+		//				bytearray[1].toString(16) + " 0x" +
+		//				bytearray[2].toString(16) + " 0x" +
+		//				bytearray[3].toString(16));
     };
 
     initialize = () => {
@@ -108,11 +114,13 @@ const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
 const NINA_NAME = "NINA-W1-B9E61A";
 const SINGLE_PACKET_SIZE = 200;
 window.device;
-let imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * 4);
+const SizeOfUint32 = 4;
+let imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * SizeOfUint32);
 const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
 const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
 let frameOffset = 0;
 let frameTransmission = false;
+let numberOfPackets = 0;
 
 function compareArray4Bytes(a1, a2) {
 	if (a1.getUint8(0) == a2[0] &&
@@ -138,6 +146,8 @@ function handleCharacteristicValueChanged(event) {
 			frameOffset = 0;
 			VideoDisplay.drawImage(imageByteArray);
 			console.log('endOfFrame'); 
+			console.log('numberOfPackets = ', numberOfPackets); 
+			numberOfPackets = 0;
 		} else {
 			console.log("Size 4, but neither SOF nor EOF: 0x" + 
 						value.getUint8(0).toString(16) + " 0x" + 
@@ -148,10 +158,14 @@ function handleCharacteristicValueChanged(event) {
 	}
 	
 	if (value.buffer.byteLength == SINGLE_PACKET_SIZE && frameTransmission == true) {
-		for (let i = 0; i < SINGLE_PACKET_SIZE; i++) {
-			imageByteArray[frameOffset + i] = value.getUint8(i);
+		for (let i = 0; i < SINGLE_PACKET_SIZE; i += 4) {
+			imageByteArray[frameOffset + i] = value.getUint8(i + 2);
+			imageByteArray[frameOffset + i + 1] = value.getUint8(i + 1);
+			imageByteArray[frameOffset + i + 2] = value.getUint8(i);
+			imageByteArray[frameOffset + i + 3] = 255;
 		}
 		frameOffset += SINGLE_PACKET_SIZE;
+		++numberOfPackets;
 	}
 }
 
