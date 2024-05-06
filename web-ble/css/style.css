@@ -55,8 +55,8 @@ header #subtitle {
     width: 9em;
     height: 2em;
     position: absolute;
-    right: calc(6rem + 7px);
-    bottom: 7px;
+    right: 2px;
+    bottom: 6px;
     padding: 5px;
     background: #ddd;
     font-size: small;
@@ -79,7 +79,7 @@ header #subtitle {
 }
 
 #doom-panel {
-    text-align: center;
+    display: inline;
     position: relative;
 }
 
@@ -93,7 +93,7 @@ header #subtitle {
     --primary: #1a1a1a;
 }
 
-#ble-panel {
+.align-center {
     text-align: center;
 }
 
