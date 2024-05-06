@@ -32,7 +32,7 @@
                 Receiving data
             </div>
             <div class="col text-center">
-                Sending data
+                Logs
             </div>
         </div>
         <div class="row">
@@ -46,7 +46,7 @@
                 </div>
             </div>
             <div class="col" id="doom-feedback-panel">
-                <textarea id="feedback" readonly></textarea>
+                <textarea id="feedback-text" readonly></textarea>
             </div>
         </div>
         <div class="row">
@@ -75,10 +75,10 @@ const DoomPanel = (() => {
     const CANVAS_ID = 'video-canvas';
     let ctx = null;
 
-    initialize = () => {
+    (function initialize() {
         const canvas = document.getElementById(CANVAS_ID);
         ctx = canvas.getContext("2d");
-    };
+    })();
 
     drawImage = (bytearray) => {
         // Initialize a new ImageData object
@@ -99,24 +99,23 @@ const DoomPanel = (() => {
     };
 
     return {
-        initialize,
         drawImage
     }
 
 })();
 
 const StatusPanel = (() => {
-    const STATUS_PANEL = 'status-panel';
-    const STATUS_TEXT = 'status-text';
-    const STATUS_ICON = 'status-icon';
+    const STATUS_PANEL_ID = 'status-panel';
+    const STATUS_TEXT_ID = 'status-text';
+    const STATUS_ICON_ID = 'status-icon';
     let statusText = null;
     let statusIcon = null;
 
-    const initialize = () => {
-        const statusPanel = document.getElementById(STATUS_PANEL);
-        statusText = statusPanel.querySelector(`#${STATUS_TEXT}`);
-        statusIcon = statusPanel.querySelector(`#${STATUS_ICON}`);
-    };
+    (function initialize() {
+        const statusPanel = document.getElementById(STATUS_PANEL_ID);
+        statusText = statusPanel.querySelector(`#${STATUS_TEXT_ID}`);
+        statusIcon = statusPanel.querySelector(`#${STATUS_ICON_ID}`);
+    })();
 
     const connect = () => {
         statusText.innerHTML = 'Connected';
@@ -129,9 +128,28 @@ const StatusPanel = (() => {
     };
 
     return {
-        initialize,
         connect,
         disconnect
+    }
+})();
+
+const FeedbackPanel = (() => {
+    const FEEDBACK_PANEL_ID = 'doom-feedback-panel';
+    const FEEDBACK_TEXT_ID = 'feedback-text';
+    let textFeedback = null;
+
+    (function initialize() {
+        const feedbackPanel = document.getElementById(FEEDBACK_PANEL_ID);
+        textFeedback = feedbackPanel.querySelector(`#${FEEDBACK_TEXT_ID}`);
+    })();
+
+    const addText = (text) => {
+        textFeedback.value = text + '\n' + textFeedback.value; 
+        console.log(text);
+    };
+
+    return {
+        addText
     }
 })();
 
@@ -203,14 +221,13 @@ const openDevice = async (device) => {
 		const characteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
 		characteristic.startNotifications();
 		characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-        console.log('Connected to device', device);
-        //statusElement.innerHTML = `Connected to ${device.name}`
+
         StatusPanel.connect();
+        FeedbackPanel.addText(`Connected to ${device.name}`);
 
         device.ongattserverdisconnected = _ => {
-            console.log(`Disconnected ${device.id}`);
-            //statusElement.innerHTML = "Not Connected";
             StatusPanel.disconnect();
+            FeedbackPanel.addText(`Disconnected ${device.id}`);
         };
     } catch (err) {
         console.warn(err);
@@ -236,10 +253,6 @@ const disconnect = async () => {
 const init = () => {
     document.querySelector('#connect').addEventListener('click', scan);
 	document.querySelector('#disconnect').addEventListener('click', disconnect);
-    // initialize status-panel
-    StatusPanel.initialize();
-    // initialize doom-panel
-    DoomPanel.initialize();
 }
 
 window.addEventListener('load', init);
