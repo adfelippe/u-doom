@@ -3,6 +3,7 @@ set(APP_NAME u-doom-xplr-iot-app)
 project(${APP_NAME})
 string(TOLOWER  ${CMAKE_SYSTEM_NAME} OS_NAME)
 set(DOOMGENERIC_DIR ../components/doomgeneric/doomgeneric)
+set(LODEPNG_DIR ../lodepng)
 
 # This application
 add_executable(
@@ -87,10 +88,15 @@ add_executable(
     ${DOOMGENERIC_DIR}/i_input.c
     ${DOOMGENERIC_DIR}/i_video.c
     ${DOOMGENERIC_DIR}/doomgeneric.c
+    ${LODEPNG_DIR}/lodepng.c
 )
 
 # Definitions
-add_compile_definitions(U_CFG_APP_SHORT_RANGE_UART=2)
+add_compile_definitions(
+    U_CFG_APP_SHORT_RANGE_UART=2
+    U_CFG_APP_SHORT_RANGE_MODULE_TYPE=U_SHORT_RANGE_MODULE_TYPE_NINA_W15
+    U_SHORT_RANGE_UART_BAUD_RATE=921600
+)
 
 # Get and build the ubxlib library
 set(UBXLIB_BASE ${CMAKE_CURRENT_LIST_DIR}/../components/ubxlib)
@@ -98,4 +104,6 @@ include(${UBXLIB_BASE}/port/platform/${OS_NAME}/${OS_NAME}.cmake)
 target_link_libraries(${APP_NAME} ubxlib ${UBXLIB_REQUIRED_LINK_LIBS})
 target_include_directories(
     ${APP_NAME} PUBLIC ${UBXLIB_INC} ${UBXLIB_PUBLIC_INC_PORT}
-    ${DOOMGENERIC_DIR})
+    ${DOOMGENERIC_DIR}
+    ${LODEPNG_DIR}
+)
