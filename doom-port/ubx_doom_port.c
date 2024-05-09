@@ -6,10 +6,11 @@
 #include "ubxlib.h"
 #include "doomkeys.h"
 #include "doomgeneric.h"
+#include "lodepng.h"
 
-#define DOOM_FRAME_SIZE     (DOOMGENERIC_RESX * DOOMGENERIC_RESY * sizeof(uint32_t))
-#define SINGLE_PACKET_SIZE  200
-#define PACKETS_TO_SEND     (DOOM_FRAME_SIZE / SINGLE_PACKET_SIZE)
+// X * Y * 4 (RGBA size)
+#define DOOM_FRAME_SIZE     (DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4)
+#define SINGLE_PACKET_SIZE  242
 
 const char gStartOfFrame[] = {0xCA, 0xFE, 0xBA, 0xBE};
 const char gEndOfFrame[] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -46,6 +47,45 @@ static void connectionCallback(int32_t connHandle, char *address, int32_t status
     }
 }
 
+static size_t covertFrameToPng(uint8_t *pPngArray) {
+    size_t pngSize;
+    uint8_t *pScreenBuffer = (uint8_t *)DG_ScreenBuffer;
+    uint8_t pImageBuffer[DOOM_FRAME_SIZE];
+
+    for (uint32_t i = 0; i < DOOM_FRAME_SIZE; i += 4) {
+        pImageBuffer[i] = pScreenBuffer[i + 2];
+        pImageBuffer[i + 1] = pScreenBuffer[i + 1];
+        pImageBuffer[i + 2] = pScreenBuffer[i];
+        pImageBuffer[i + 3] = 0xFF;
+    }
+
+    uint32_t error = lodepng_encode32(&pPngArray, &pngSize, pImageBuffer, DOOMGENERIC_RESX, DOOMGENERIC_RESY);
+    if (error) {
+        printf("lodepng error %u: %s\n", error, lodepng_error_text(error));
+        pngSize = 0;
+    }
+
+    return pngSize;
+}
+
+static void sendBle(const uint8_t *data, uint32_t size)
+{
+    if (gIsConnected) {
+        uBleSpsSend(gDeviceHandle, gSpsChannel, data, size);
+    }
+}
+
+static void prepareImageBuffer(uint8_t *pImageBuffer, uint32_t bufferSize) {
+    uint8_t *pScreenBuffer = (uint8_t *)DG_ScreenBuffer;
+    
+    for (uint32_t i = 0; i < bufferSize; i += 4) {
+        pImageBuffer[i] = pScreenBuffer[i + 2];
+        pImageBuffer[i + 1] = pScreenBuffer[i + 1];
+        pImageBuffer[i + 2] = pScreenBuffer[i];
+        pImageBuffer[i + 3] = 0xFF;
+    }
+}
+
 void DG_Init()
 {
     // Remove the line below if you want the log printouts from ubxlib
@@ -76,17 +116,47 @@ void DG_Init()
     }
 }
 
-void DG_DrawFrame()
+void DG_DrawFrame(void)
 {
     if (gIsConnected) {
-        uint8_t *pScreenBuffer = (uint8_t *)DG_ScreenBuffer;
-        uint32_t offset = 0;
-        uBleSpsSend(gDeviceHandle, gSpsChannel, gStartOfFrame, sizeof(gStartOfFrame));
-        for (uint32_t i = 0; i < PACKETS_TO_SEND; ++i) {
-            uBleSpsSend(gDeviceHandle, gSpsChannel, &pScreenBuffer[offset], SINGLE_PACKET_SIZE);
-            offset += SINGLE_PACKET_SIZE;
+        uint8_t pImageBuffer[DOOM_FRAME_SIZE];
+        uint8_t *pPngArray;
+        size_t pngSize;
+        uint32_t error;
+
+        prepareImageBuffer(pImageBuffer, DOOM_FRAME_SIZE);
+        error = lodepng_encode32(&pPngArray, &pngSize, pImageBuffer, DOOMGENERIC_RESX, DOOMGENERIC_RESY);
+        if (error) {
+            printf("lodepng error %u: %s\n", error, lodepng_error_text(error));
+            pngSize = 0;
         }
-        uBleSpsSend(gDeviceHandle, gSpsChannel, gEndOfFrame, sizeof(gEndOfFrame));
+        printf("pngSize = %lu\n", pngSize);
+
+        if (pngSize) {
+            uint32_t packetsToSend = pngSize / SINGLE_PACKET_SIZE;
+            uint32_t remainder = pngSize % SINGLE_PACKET_SIZE;
+            uint32_t offset = 0;
+
+            // printf("packetsToSend = %u\n", packetsToSend);
+            // printf("remainder = %u\n", remainder);
+
+            sendBle(gStartOfFrame, sizeof(gStartOfFrame));
+
+            for (uint32_t i = 0; i < packetsToSend; ++i) {
+                sendBle(&pPngArray[offset], SINGLE_PACKET_SIZE);
+                offset += SINGLE_PACKET_SIZE;
+                DG_SleepMs(10);
+            }
+
+            if (remainder) {
+                sendBle(&pPngArray[offset], remainder);
+            }
+
+            sendBle(gEndOfFrame, sizeof(gEndOfFrame));
+            free(pPngArray);
+        }
+    } else {
+        DG_SleepMs(500);
     }
 }
 
