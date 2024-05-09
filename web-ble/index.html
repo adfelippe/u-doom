@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>u-doom: Streaming Doom over BLE to a WebBluetooth application</title>
     <link rel="icon" type="image/png" href="images/favicon.ico">
-    <link rel="manifest" href="images/site.webmanifest">
     <link rel="stylesheet" href="css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     <link href="css/style.css" rel="stylesheet">
 </head>
@@ -33,24 +32,26 @@
                 Receiving data
             </div>
             <div class="col text-center">
-                Sending data
+                Logs
             </div>
         </div>
         <div class="row">
-            <div class="col" id="doom-panel">
-                <canvas id="video-canvas"></canvas>
-                <div id="status-panel">
-                    <div id="status-icon"></div>
-                    <div id="status">Not Connected</div>
+            <div class="col align-center">
+                <div id="doom-panel">
+                    <canvas id="video-canvas"></canvas>
+                    <div id="status-panel">
+                        <div id="status-icon"></div>
+                        <div id="status-text">Not Connected</div>
+                    </div>
                 </div>
             </div>
             <div class="col" id="doom-feedback-panel">
-                <textarea id="feedback" readonly></textarea>
+                <textarea id="feedback-text" readonly></textarea>
             </div>
         </div>
         <div class="row">
             <div class="col" id="doom-action-panel">
-                <div class="col" id="ble-panel">
+                <div class="col align-center" id="ble-panel">
                     <button id="connect" class="btn btn-success">CONNECT</button>
                     <button id="disconnect" class="btn btn-danger">DISCONNECT</button>
                 </div>
@@ -70,49 +71,90 @@
 const IMAGE_WIDTH = 640;
 const IMAGE_HEIGTH = 400;
 
-const VideoDisplay = (() => {
+function arrayToBase64(bytes) {
+    let binary = '';
+    let len = bytes.byteLength;
+    for (var i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+	
+    return window.btoa(binary);
+}
+
+const DoomPanel = (() => {
     const CANVAS_ID = 'video-canvas';
     let ctx = null;
 
-    loadContext = () => {
+    (function initialize() {
         const canvas = document.getElementById(CANVAS_ID);
         ctx = canvas.getContext("2d");
-    };
+    })();
 
     drawImage = (bytearray) => {
-        // Initialize a new ImageData object
-		let imageArray = new Uint8ClampedArray(bytearray)
-        let imageData = new ImageData(imageArray, IMAGE_WIDTH, IMAGE_HEIGTH);
-        // Draw image data to the canvas
-        ctx.putImageData(imageData, 0, 0);
-		console.log('bytearray length: ' + bytearray.byteLength);
-		console.log('imageArray length: ' + imageArray.byteLength);
-		//let decoder = new TextDecoder("utf-8");
-		//let str = decoder.decode(value);
-		//console.log('Image data: ' + str);
-		//console.log("First RGBA: " + 
-		//				bytearray[0].toString(16) + " 0x" + 
-		//				bytearray[1].toString(16) + " 0x" +
-		//				bytearray[2].toString(16) + " 0x" +
-		//				bytearray[3].toString(16));
-    };
-
-    initialize = () => {
-        loadContext();
+		let b64 = arrayToBase64(bytearray);
+		let img = new Image(IMAGE_WIDTH, IMAGE_HEIGTH);
+		img.src = "data:image/png;base64," + b64;
+		ctx.drawImage(img, 0, 0);
     };
 
     return {
-        initialize,
         drawImage
     }
 
 })();
 
+const StatusPanel = (() => {
+    const STATUS_PANEL_ID = 'status-panel';
+    const STATUS_TEXT_ID = 'status-text';
+    const STATUS_ICON_ID = 'status-icon';
+    let statusText = null;
+    let statusIcon = null;
+
+    (function initialize() {
+        const statusPanel = document.getElementById(STATUS_PANEL_ID);
+        statusText = statusPanel.querySelector(`#${STATUS_TEXT_ID}`);
+        statusIcon = statusPanel.querySelector(`#${STATUS_ICON_ID}`);
+    })();
+
+    const connect = () => {
+        statusText.innerHTML = 'Connected';
+        statusIcon.classList.add("connected");
+    };
+
+    const disconnect = () => {
+        statusText.innerHTML = 'Not Connected';
+        statusIcon.classList.remove("connected");
+    };
+
+    return {
+        connect,
+        disconnect
+    }
+})();
+
+const FeedbackPanel = (() => {
+    const FEEDBACK_PANEL_ID = 'doom-feedback-panel';
+    const FEEDBACK_TEXT_ID = 'feedback-text';
+    let textFeedback = null;
+
+    (function initialize() {
+        const feedbackPanel = document.getElementById(FEEDBACK_PANEL_ID);
+        textFeedback = feedbackPanel.querySelector(`#${FEEDBACK_TEXT_ID}`);
+    })();
+
+    const addText = (text) => {
+        textFeedback.value = text + '\n' + textFeedback.value; 
+        console.log(text);
+    };
+
+    return {
+        addText
+    }
+})();
 
 const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
 const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
 const NINA_NAME = "NINA-W1-B9E61A";
-const SINGLE_PACKET_SIZE = 200;
 window.device;
 const SizeOfUint32 = 4;
 let imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * SizeOfUint32);
@@ -120,7 +162,7 @@ const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
 const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
 let frameOffset = 0;
 let frameTransmission = false;
-let numberOfPackets = 0;
+let numberOfBytes = 0;
 
 function compareArray4Bytes(a1, a2) {
 	if (a1.getUint8(0) == a2[0] &&
@@ -135,37 +177,26 @@ function compareArray4Bytes(a1, a2) {
 
 function handleCharacteristicValueChanged(event) {
 	const value = event.target.value;
-  
+	const bufferLength = value.buffer.byteLength;
 	// Probably start or end of frame
-	if (value.buffer.byteLength == 4) {
-		if (compareArray4Bytes(value, startOfFrame) == true) {
-		console.log('startOfFrame'); 
+	if (bufferLength == 4 && compareArray4Bytes(value, startOfFrame) == true) {
 		frameTransmission = true;
-		} else if (compareArray4Bytes(value, endOfFrame) == true) {
-			frameTransmission = false;
-			frameOffset = 0;
-			VideoDisplay.drawImage(imageByteArray);
-			console.log('endOfFrame'); 
-			console.log('numberOfPackets = ', numberOfPackets); 
-			numberOfPackets = 0;
-		} else {
-			console.log("Size 4, but neither SOF nor EOF: 0x" + 
-						value.getUint8(0).toString(16) + " 0x" + 
-						value.getUint8(1).toString(16) + " 0x" +
-						value.getUint8(2).toString(16) + " 0x" +
-						value.getUint8(3).toString(16));
+		console.log('startOfFrame');
+	} else if (bufferLength == 4 && compareArray4Bytes(value, endOfFrame) == true) {
+		frameTransmission = false;
+		frameOffset = 0;
+		DoomPanel.drawImage(imageByteArray);
+		console.log('endOfFrame'); 
+		console.log('numberOfBytes = ', numberOfBytes); 
+		numberOfBytes = 0;
+	} else if (frameTransmission == true) {
+		for (let i = 0; i < bufferLength; i++) {
+			imageByteArray[frameOffset + i] = value.getUint8(i);
 		}
-	}
-	
-	if (value.buffer.byteLength == SINGLE_PACKET_SIZE && frameTransmission == true) {
-		for (let i = 0; i < SINGLE_PACKET_SIZE; i += 4) {
-			imageByteArray[frameOffset + i] = value.getUint8(i + 2);
-			imageByteArray[frameOffset + i + 1] = value.getUint8(i + 1);
-			imageByteArray[frameOffset + i + 2] = value.getUint8(i);
-			imageByteArray[frameOffset + i + 3] = 255;
-		}
-		frameOffset += SINGLE_PACKET_SIZE;
-		++numberOfPackets;
+		frameOffset += bufferLength;
+		numberOfBytes += bufferLength;
+	} else {
+		console.log('Unknown state, bufferLength = ', bufferLength); 
 	}
 }
 
@@ -177,12 +208,13 @@ const openDevice = async (device) => {
 		const characteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
 		characteristic.startNotifications();
 		characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-        console.log('Connected to device', device);
-        statusElement.innerHTML = `Connected to ${device.name}`
+
+        StatusPanel.connect();
+        FeedbackPanel.addText(`Connected to ${device.name}`);
 
         device.ongattserverdisconnected = _ => {
-            console.log(`Disconnected ${device.id}`);
-            statusElement.innerHTML = "Not Connected";
+            StatusPanel.disconnect();
+            FeedbackPanel.addText(`Disconnected ${device.id}`);
         };
     } catch (err) {
         console.warn(err);
@@ -208,9 +240,6 @@ const disconnect = async () => {
 const init = () => {
     document.querySelector('#connect').addEventListener('click', scan);
 	document.querySelector('#disconnect').addEventListener('click', disconnect);
-    statusElement = document.querySelector('#status');
-    // add canvas in the doom-panel, later we can review the position and move to the html
-    VideoDisplay.initialize('doom-panel');
 }
 
 window.addEventListener('load', init);
