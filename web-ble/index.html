@@ -91,10 +91,13 @@ const DoomPanel = (() => {
     })();
 
     drawImage = (bytearray) => {
-		let b64 = arrayToBase64(bytearray);
-		let img = new Image(IMAGE_WIDTH, IMAGE_HEIGTH);
-		img.src = "data:image/png;base64," + b64;
-		ctx.drawImage(img, 0, 0);
+        let b64 = arrayToBase64(bytearray);
+        let img = new Image(IMAGE_WIDTH, IMAGE_HEIGTH);
+        img.src = "data:image/png;base64," + b64;
+        img.onload = function() {
+            ctx.drawImage(img, 0, 0);
+        };
+        //console.log('base64: ', b64);
     };
 
     return {
@@ -160,10 +163,11 @@ const SizeOfUint32 = 4;
 let imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * SizeOfUint32);
 const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
 const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
+const ackFrame = new ArrayBuffer([0xBE, 0xEF]);
 let frameOffset = 0;
-let frameTransmission = false;
 let numberOfBytes = 0;
 let receivingFrameSize = 0;
+let spsCharacteristic = null;
 
 function compareArray4Bytes(a1, a2) {
 	if (a1.getUint8(0) == a2[0] &&
@@ -179,30 +183,27 @@ function compareArray4Bytes(a1, a2) {
 function handleCharacteristicValueChanged(event) {
 	const value = event.target.value;
 	const bufferLength = value.buffer.byteLength;
-	// Probably start or end of frame
+	// Check for SOF
 	if (bufferLength == 8 && compareArray4Bytes(value, startOfFrame) == true) {
-		frameTransmission = true;
 		receivingFrameSize = value.getUint32(4);
-		console.log('startOfFrame, size = ', receivingFrameSize);
-	} else if (frameTransmission == true) {
+		console.log('startOfFrame, receivingFrameSize = ', receivingFrameSize);
+		// Resync just in case
+		numberOfBytes = 0;
+		frameOffset = 0;
+	} else {
 		for (let i = 0; i < bufferLength; i++) {
 			imageByteArray[frameOffset + i] = value.getUint8(i);
 		}
 		frameOffset += bufferLength;
 		numberOfBytes += bufferLength;
-		console.log('bufferLength = ', bufferLength);
+		//console.log('bufferLength = ', bufferLength);
 		
 		if (numberOfBytes == receivingFrameSize) {
-			console.log('Drawing frame');
+			console.log('Drawing frame, numberOfBytes = ', numberOfBytes);
 			DoomPanel.drawImage(imageByteArray);
-			console.log('numberOfBytes = ', numberOfBytes);
 			numberOfBytes = 0;
-			receivingFrameSize = 0;
 			frameOffset = 0;
-			frameTransmission = false;
 		}
-	} else {
-		console.log('Unknown state, bufferLength = ', bufferLength); 
 	}
 }
 
@@ -211,9 +212,9 @@ const openDevice = async (device) => {
     
     try {
         const service = await server.getPrimaryService(NINA_SPS_SERVICE);
-		const characteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
-		characteristic.startNotifications();
-		characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+		spsCharacteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
+		await spsCharacteristic.startNotifications();
+		await spsCharacteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
 
         StatusPanel.connect();
         FeedbackPanel.addText(`Connected to ${device.name}`);
