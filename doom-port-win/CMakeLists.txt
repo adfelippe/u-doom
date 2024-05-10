@@ -8,6 +8,7 @@ set(LODEPNG_DIR ../lodepng)
 # This application
 add_executable(
     ${APP_NAME} ubx_doom_port.c
+    usleep.c
     ${DOOMGENERIC_DIR}/dummy.c
     ${DOOMGENERIC_DIR}/am_map.c
     ${DOOMGENERIC_DIR}/doomdef.c
