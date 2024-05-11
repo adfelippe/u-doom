@@ -1,2 +1,3 @@
 **/build/*
 .vscode/**
+web-ble/node_modules/**

@@ -55,8 +55,8 @@ header #subtitle {
     width: 9em;
     height: 2em;
     position: absolute;
-    right: calc(4rem + 2px);
-    bottom: 7px;
+    right: 2px;
+    bottom: 6px;
     padding: 5px;
     background: #ddd;
     font-size: small;
@@ -70,7 +70,7 @@ header #subtitle {
     display: inline-block;
 }
 
-#status {
+#status-text {
     display: inline-block;
 }
 
@@ -79,11 +79,11 @@ header #subtitle {
 }
 
 #doom-panel {
-    text-align: center;
+    display: inline;
     position: relative;
 }
 
-#feedback {
+#feedback-text {
     resize: none;
     width: 100%;
     height: 100%;
@@ -93,7 +93,7 @@ header #subtitle {
     --primary: #1a1a1a;
 }
 
-#ble-panel {
+.align-center {
     text-align: center;
 }
 
