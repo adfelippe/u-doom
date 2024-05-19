@@ -56,7 +56,7 @@ header #subtitle {
     height: 2em;
     position: absolute;
     right: 2px;
-    bottom: 6px;
+    top: 2px;
     padding: 5px;
     background: #ddd;
     font-size: small;
@@ -79,7 +79,7 @@ header #subtitle {
 }
 
 #doom-panel {
-    display: inline;
+    display: inline-flex;
     position: relative;
 }
 

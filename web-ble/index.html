@@ -62,213 +62,234 @@
         <div class="col">
         </div>
     </footer>
+
+    <script type="text/javascript">
+        "use strict";
+
+        const IMAGE_WIDTH = 320;
+        const IMAGE_HEIGTH = 200;
+    
+        const DoomPanel = (() => {
+            const CANVAS_ID = 'video-canvas';
+            let ctx = null;
+    
+            (function initialize() {
+                const canvas = document.getElementById(CANVAS_ID);
+                ctx = canvas.getContext("2d");
+            })();
+    
+            const drawImage = (url) => {
+                let img = new Image(IMAGE_WIDTH, IMAGE_HEIGTH);
+                img.src = url;
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0);
+                };
+            };
+    
+            return {
+                drawImage
+            }
+    
+        })();
+    
+        const StatusPanel = (() => {
+            const STATUS_PANEL_ID = 'status-panel';
+            const STATUS_TEXT_ID = 'status-text';
+            const STATUS_ICON_ID = 'status-icon';
+            let statusText = null;
+            let statusIcon = null;
+    
+            (function initialize() {
+                const statusPanel = document.getElementById(STATUS_PANEL_ID);
+                statusText = statusPanel.querySelector(`#${STATUS_TEXT_ID}`);
+                statusIcon = statusPanel.querySelector(`#${STATUS_ICON_ID}`);
+            })();
+    
+            const connect = () => {
+                statusText.innerHTML = 'Connected';
+                statusIcon.classList.add("connected");
+            };
+    
+            const disconnect = () => {
+                statusText.innerHTML = 'Not Connected';
+                statusIcon.classList.remove("connected");
+            };
+    
+            return {
+                connect,
+                disconnect
+            }
+        })();
+    
+        const FeedbackPanel = (() => {
+            const FEEDBACK_PANEL_ID = 'doom-feedback-panel';
+            const FEEDBACK_TEXT_ID = 'feedback-text';
+            let textFeedback = null;
+    
+            (function initialize() {
+                const feedbackPanel = document.getElementById(FEEDBACK_PANEL_ID);
+                textFeedback = feedbackPanel.querySelector(`#${FEEDBACK_TEXT_ID}`);
+            })();
+    
+            const addText = (text) => {
+                textFeedback.value = text + '\n' + textFeedback.value; 
+                console.log(text);
+            };
+    
+            return {
+                addText
+            }
+        })();
+    
+        const ImageProcessor = (() => {
+            const SizeOfUint32 = 4;
+            const imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * SizeOfUint32);
+            const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
+            const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
+            const ackFrame = new ArrayBuffer([0xBE, 0xEF]);
+    
+            let frameOffset = 0;
+            let receivingFrameSize = 0;
+            let spsCharacteristic = null;
+    
+            const compareArray4Bytes = (a1, a2) => {
+                if (a1.getUint8(0) === a2[0] &&
+                    a1.getUint8(1) === a2[1] &&
+                    a1.getUint8(2) === a2[2] &&
+                    a1.getUint8(3) === a2[3]) {
+                    return true;
+                }
+                return false;
+            };
+    
+            const receivePackage = (value) => {
+                const bufferLength = value.buffer.byteLength;
+                // Check for SOF
+                if (bufferLength === 8 && compareArray4Bytes(value, startOfFrame)) {
+                    receivingFrameSize = value.getUint32(4);
+                    console.log('startOfFrame, receivingFrameSize = ', receivingFrameSize);
+                    // Resync just in case
+                    frameOffset = 0;
+                } else {
+                    for (let i = 0; i < bufferLength; i++) {
+                        imageByteArray[frameOffset + i] = value.getUint8(i);
+                    }
+                    frameOffset += bufferLength;
+                    //console.log('bufferLength = ', bufferLength);
+                }
+            };
+    
+            const arrayToBase64 = () => {
+                let binary = '';
+                let len = imageByteArray.byteLength;
+                for (var i = 0; i < len; i++) {
+                    binary += String.fromCharCode(imageByteArray[i]);
+                }
+                return window.btoa(binary);
+            };
+    
+            const isReady = () => {
+                return frameOffset === receivingFrameSize;
+            };
+    
+            const reset = () => {
+                frameOffset = 0;
+            };
+    
+            const getImage = () => {
+                return `data:image/png;base64,${arrayToBase64()}`;
+            };
+    
+            return {
+                receivePackage,
+                isReady,
+                reset,
+                getImage
+            };
+        })();
+    
+        const BLEManager = (() => {
+            const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
+            const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
+            const NINA_NAME = "NINA-W1-B9E61A";
+    
+            const openDevice = async (device) => {
+                const server = await device.gatt.connect();
+                
+                try {
+                    const service = await server.getPrimaryService(NINA_SPS_SERVICE);
+                    spsCharacteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
+                    await spsCharacteristic.startNotifications();
+                    await spsCharacteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+    
+                    StatusPanel.connect();
+                    FeedbackPanel.addText(`Connected to ${device.name}`);
+    
+                    device.ongattserverdisconnected = _ => {
+                        StatusPanel.disconnect();
+                        FeedbackPanel.addText(`Disconnected ${device.id}`);
+                    };
+                } catch (err) {
+                    console.warn(err);
+                }
+            };
+    
+            const handleCharacteristicValueChanged = (event) => {
+                const value = event.target.value;
+                ImageProcessor.receivePackage(value);
+                if (ImageProcessor.isReady()) {
+                    const image = getImage();
+                    ImageProcessor.reset();
+                }
+            }
+    
+            const scan = async () => {
+                try {
+                    device = await navigator.bluetooth.requestDevice({
+                        filters: [{ services: [NINA_SPS_SERVICE] }]
+                    });
+    
+                    await openDevice(device);
+                } catch (err) {
+                    // ignore if we didn't get a device
+                }
+            }
+    
+            const disconnect = async () => {
+                await device.gatt.disconnect();
+            }
+    
+            return {
+                scan,
+                disconnect
+            }
+        })();
+    
+    
+        window.onload = () => {
+            document.querySelector('#connect').addEventListener('click', BLEManager.scan);
+            document.querySelector('#disconnect').addEventListener('click', BLEManager.disconnect);
+        };
+    
+        // register key listener
+        document.onkeydown = (e) => {
+            e = e || window.event;
+    
+            if (e.keyCode === 38) {
+                console.log('↑');
+            } else if (e.keyCode === 40) {
+                console.log('↓');
+            } else if (e.keyCode === 37) {
+                console.log('←');
+            } else if (e.keyCode === 39) {
+                console.log('→');
+            } else if (e.ctrlKey) {
+                console.log('Ctrl');
+            } else if (e.keyCode === 13) {
+                console.log('Enter');
+            }
+        };
+    
+    </script>
 </body>
 </html>
-<!DOCTYPE html>
-
-<script>
-
-const IMAGE_WIDTH = 640;
-const IMAGE_HEIGTH = 400;
-
-function arrayToBase64(bytes) {
-    let binary = '';
-    let len = bytes.byteLength;
-    for (var i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-	
-    return window.btoa(binary);
-}
-
-const DoomPanel = (() => {
-    const CANVAS_ID = 'video-canvas';
-    let ctx = null;
-
-    (function initialize() {
-        const canvas = document.getElementById(CANVAS_ID);
-        ctx = canvas.getContext("2d");
-    })();
-
-    drawImage = (bytearray) => {
-        let b64 = arrayToBase64(bytearray);
-        let img = new Image(IMAGE_WIDTH, IMAGE_HEIGTH);
-        img.src = "data:image/png;base64," + b64;
-        img.onload = function() {
-            ctx.drawImage(img, 0, 0);
-        };
-        //console.log('base64: ', b64);
-    };
-
-    return {
-        drawImage
-    }
-
-})();
-
-const StatusPanel = (() => {
-    const STATUS_PANEL_ID = 'status-panel';
-    const STATUS_TEXT_ID = 'status-text';
-    const STATUS_ICON_ID = 'status-icon';
-    let statusText = null;
-    let statusIcon = null;
-
-    (function initialize() {
-        const statusPanel = document.getElementById(STATUS_PANEL_ID);
-        statusText = statusPanel.querySelector(`#${STATUS_TEXT_ID}`);
-        statusIcon = statusPanel.querySelector(`#${STATUS_ICON_ID}`);
-    })();
-
-    const connect = () => {
-        statusText.innerHTML = 'Connected';
-        statusIcon.classList.add("connected");
-    };
-
-    const disconnect = () => {
-        statusText.innerHTML = 'Not Connected';
-        statusIcon.classList.remove("connected");
-    };
-
-    return {
-        connect,
-        disconnect
-    }
-})();
-
-const FeedbackPanel = (() => {
-    const FEEDBACK_PANEL_ID = 'doom-feedback-panel';
-    const FEEDBACK_TEXT_ID = 'feedback-text';
-    let textFeedback = null;
-
-    (function initialize() {
-        const feedbackPanel = document.getElementById(FEEDBACK_PANEL_ID);
-        textFeedback = feedbackPanel.querySelector(`#${FEEDBACK_TEXT_ID}`);
-    })();
-
-    const addText = (text) => {
-        textFeedback.value = text + '\n' + textFeedback.value; 
-        console.log(text);
-    };
-
-    return {
-        addText
-    }
-})();
-
-const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
-const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
-const NINA_NAME = "NINA-W1-B9E61A";
-window.device;
-const SizeOfUint32 = 4;
-let imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * SizeOfUint32);
-const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
-const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
-const ackFrame = new ArrayBuffer([0xBE, 0xEF]);
-let frameOffset = 0;
-let numberOfBytes = 0;
-let receivingFrameSize = 0;
-let spsCharacteristic = null;
-
-function compareArray4Bytes(a1, a2) {
-	if (a1.getUint8(0) == a2[0] &&
-		a1.getUint8(1) == a2[1] &&
-		a1.getUint8(2) == a2[2] &&
-		a1.getUint8(3) == a2[3]) {
-		return true;
-	}
-	
-	return false;
-}
-
-function handleCharacteristicValueChanged(event) {
-	const value = event.target.value;
-	const bufferLength = value.buffer.byteLength;
-	// Check for SOF
-	if (bufferLength == 8 && compareArray4Bytes(value, startOfFrame) == true) {
-		receivingFrameSize = value.getUint32(4);
-		console.log('startOfFrame, receivingFrameSize = ', receivingFrameSize);
-		// Resync just in case
-		numberOfBytes = 0;
-		frameOffset = 0;
-	} else {
-		for (let i = 0; i < bufferLength; i++) {
-			imageByteArray[frameOffset + i] = value.getUint8(i);
-		}
-		frameOffset += bufferLength;
-		numberOfBytes += bufferLength;
-		//console.log('bufferLength = ', bufferLength);
-		
-		if (numberOfBytes == receivingFrameSize) {
-			console.log('Drawing frame, numberOfBytes = ', numberOfBytes);
-			DoomPanel.drawImage(imageByteArray);
-			numberOfBytes = 0;
-			frameOffset = 0;
-		}
-	}
-}
-
-const openDevice = async (device) => {
-    const server = await device.gatt.connect();
-    
-    try {
-        const service = await server.getPrimaryService(NINA_SPS_SERVICE);
-		spsCharacteristic = await service.getCharacteristic(NINA_SPS_CHARACTERISTIC);
-		await spsCharacteristic.startNotifications();
-		await spsCharacteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-
-        StatusPanel.connect();
-        FeedbackPanel.addText(`Connected to ${device.name}`);
-
-        device.ongattserverdisconnected = _ => {
-            StatusPanel.disconnect();
-            FeedbackPanel.addText(`Disconnected ${device.id}`);
-        };
-    } catch (err) {
-        console.warn(err);
-    }
-}
-
-const scan = async () => {
-    try {
-        device = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [NINA_SPS_SERVICE] }]
-        });
-
-        await openDevice(device);
-    } catch (err) {
-        // ignore if we didn't get a device
-    }
-}
-
-const disconnect = async () => {
-	await device.gatt.disconnect();
-}
-
-const init = () => {
-    document.querySelector('#connect').addEventListener('click', scan);
-	document.querySelector('#disconnect').addEventListener('click', disconnect);
-}
-
-window.addEventListener('load', init);
-
-// register key listener
-document.onkeydown = (e) => {
-    e = e || window.event;
-
-    if (e.keyCode === 38) {
-        console.log('↑');
-    } else if (e.keyCode === 40) {
-        console.log('↓');
-    } else if (e.keyCode === 37) {
-        console.log('←');
-    } else if (e.keyCode === 39) {
-        console.log('→');
-    } else if (e.ctrlKey) {
-        console.log('Ctrl');
-    } else if (e.keyCode === 13) {
-        console.log('Enter');
-    }
-
-}
-
-</script>
