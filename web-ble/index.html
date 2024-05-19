@@ -239,7 +239,7 @@
                 const value = event.target.value;
                 ImageProcessor.receivePackage(value);
                 if (ImageProcessor.isReady()) {
-                    const image = getImage();
+                    const image = ImageProcessor.getImage();
                     DoomPanel.drawImage(image);
                     ImageProcessor.reset();
                 }
