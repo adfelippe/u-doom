@@ -38,7 +38,7 @@
         <div class="row">
             <div class="col align-center">
                 <div id="doom-panel">
-                    <canvas id="video-canvas"></canvas>
+                    <canvas id="video-canvas" width="320px" height="200px"></canvas>
                     <div id="status-panel">
                         <div id="status-icon"></div>
                         <div id="status-text">Not Connected</div>
@@ -150,7 +150,6 @@
     
             let frameOffset = 0;
             let receivingFrameSize = 0;
-            let spsCharacteristic = null;
     
             const compareArray4Bytes = (a1, a2) => {
                 if (a1.getUint8(0) === a2[0] &&
@@ -212,7 +211,9 @@
             const NINA_SPS_SERVICE = '2456e1b9-26e2-8f83-e744-f34f01e9d701';
             const NINA_SPS_CHARACTERISTIC = '2456e1b9-26e2-8f83-e744-f34f01e9d703';
             const NINA_NAME = "NINA-W1-B9E61A";
-    
+            let device = null;
+            let spsCharacteristic = null;
+
             const openDevice = async (device) => {
                 const server = await device.gatt.connect();
                 
@@ -238,7 +239,8 @@
                 const value = event.target.value;
                 ImageProcessor.receivePackage(value);
                 if (ImageProcessor.isReady()) {
-                    const image = getImage();
+                    const image = ImageProcessor.getImage();
+                    DoomPanel.drawImage(image);
                     ImageProcessor.reset();
                 }
             }
