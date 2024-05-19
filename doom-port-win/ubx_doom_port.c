@@ -14,7 +14,7 @@
 #define SINGLE_PACKET_SIZE      244
 #define SEMAPHORE_TIMEOUT_MS    1000
 #define TX_SLEEP_MS             1
-#define TX_SLEEP_US             10000
+#define TX_SLEEP_US             8000
 #define KEY_QUEUE_SIZE          100
 
 enum { 
@@ -33,6 +33,7 @@ const char gEndOfFrame[] = {0xDE, 0xAD, 0xBE, 0xEF};
 // Button frame format:
 // [HEADER][PRESSED][KEY]
 const uint8_t gButtonFrameHeader[] = {0xAB, 0xCD};
+const uint8_t gAckFrame[] = {0xFE, 0xED};
 
 typedef struct uKeyData {
     bool isPressed;
@@ -53,6 +54,9 @@ static int32_t gSpsChannel = -1;
 static int32_t gMtuSize = 0;
 static uDeviceHandle_t gDeviceHandle;
 static uPortQueueHandle_t gKeyQueueHandle;
+static uint32_t gFrameCount = 0;
+static uint32_t gStartTimeMs = 0;
+static float gElapsedTimeSec = 0.0F;
 //static uPortSemaphoreHandle_t gTxSem;
 
 static uint8_t convertToDoomKey(uint8_t receivedKey);
@@ -83,12 +87,10 @@ static void dataAvailableCallback(int32_t channel, void *pParameters)
     uDeviceHandle_t *pDeviceHandle = (uDeviceHandle_t *)pParameters;
     int32_t length = uBleSpsReceive(*pDeviceHandle, channel, (char *)buffer, sizeof(buffer) - 1);
 
-    printf("dataAvailableCallback\n");
     if (length >= 4 && buffer[0] == gButtonFrameHeader[0] && buffer[1] == gButtonFrameHeader[1]) {
         uKeyData_t keyData = {.isPressed = buffer[2], .key = convertToDoomKey(buffer[3])};
         uPortQueueSend(gKeyQueueHandle, &keyData);
-        printf("Key pressed: %u, value: %u\n", buffer[2], buffer[3]);
-        //uPortSemaphoreGive(gTxSem);
+        //printf("Key pressed: %u, value: %u\n", buffer[2], buffer[3]);
     } else {
         printf("Woops... length: %d, buffer[0] = %02X, buffer[1] = %02X\n", length, buffer[0], buffer[1]);
     }
@@ -183,7 +185,6 @@ void DG_Init()
     uPortInit();
     uDeviceInit();
     
-    // And the U-blox module
     // errorCode = uPortSemaphoreCreate(&gTxSem, 0, 1);
     // if (errorCode != 0) { 
     //     printf("Failed to create semaphore: %d\n", errorCode);
@@ -220,6 +221,7 @@ void DG_Init()
 void DG_DrawFrame()
 {
     if (gIsConnected) {
+        float fps;
         uint8_t pImageBuffer[DOOM_FRAME_SIZE];
         uint8_t *pPngArray;
         size_t pngSize;
@@ -231,16 +233,13 @@ void DG_DrawFrame()
             printf("lodepng error %u: %s\n", error, lodepng_error_text(error));
             pngSize = 0;
         }
-        printf("pngSize = %zu\n", pngSize);
+        //printf("pngSize = %zu\n", pngSize);
 
         if (pngSize) {
             uint32_t packetsToSend = pngSize / gMtuSize;
             uint32_t remainder = pngSize % gMtuSize;
             uint32_t offset = 0;
             uint8_t *pPngSizeArray = (uint8_t *)&pngSize;
-
-            //printf("packetsToSend = %u\n", packetsToSend);
-            //printf("remainder = %u\n", remainder);
 
             // Copy PNG size in bytes to start of frame - remote will expect that number of bytes
             gStartOfFrame[4] = pPngSizeArray[3];
@@ -252,6 +251,7 @@ void DG_DrawFrame()
                 printf("Waiting a few seconds before sending the first package...\n");
                 DG_SleepMs(5000);
                 gIsFirstPacket = false;
+                gStartTimeMs = DG_GetTicksMs();
             }
 
             sendBle(gStartOfFrame, sizeof(gStartOfFrame));
@@ -268,6 +268,9 @@ void DG_DrawFrame()
                 usleep(TX_SLEEP_US);
             }
 
+            ++gFrameCount;
+            fps = (float)gFrameCount / ((float)(DG_GetTicksMs() - gStartTimeMs) / 1000.0F);
+            printf("FPS: %.2f\n", fps);
             free(pPngArray);
         }
     } else {
