@@ -179,7 +179,7 @@
                 // Check for SOF
                 if (bufferLength === 8 && compareArray4Bytes(value, startOfFrame)) {
                     receivingFrameSize = value.getUint32(4);
-                    console.log('startOfFrame, receivingFrameSize = ', receivingFrameSize);
+                    //console.log('startOfFrame, receivingFrameSize = ', receivingFrameSize);
                     // Resync just in case
                     frameOffset = 0;
                 } else {
