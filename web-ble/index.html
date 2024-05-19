@@ -240,6 +240,7 @@
                 ImageProcessor.receivePackage(value);
                 if (ImageProcessor.isReady()) {
                     const image = getImage();
+                    DoomPanel.drawImage(image);
                     ImageProcessor.reset();
                 }
             }
