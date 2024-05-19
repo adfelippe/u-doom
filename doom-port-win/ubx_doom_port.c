@@ -15,9 +15,29 @@
 #define SEMAPHORE_TIMEOUT_MS    1000
 #define TX_SLEEP_MS             1
 #define TX_SLEEP_US             10000
+#define KEY_QUEUE_SIZE          100
+
+enum { 
+    UP_KEY = 38,
+    DOWN_KEY = 40,
+    LEFT_KEY = 37,
+    RIGHT_KEY = 39,
+    CTRL_KEY = 17,
+    ENTER_KEY = 13,
+    SPACE_KEY = 32,
+    ESCAPE_KEY = 27
+};
 
 char gStartOfFrame[] = {0xCA, 0xFE, 0xBA, 0xBE, 0, 0, 0, 0};
 const char gEndOfFrame[] = {0xDE, 0xAD, 0xBE, 0xEF};
+// Button frame format:
+// [HEADER][PRESSED][KEY]
+const uint8_t gButtonFrameHeader[] = {0xAB, 0xCD};
+
+typedef struct uKeyData {
+    bool isPressed;
+    uint8_t key;
+} uKeyData_t;
 
 static uDeviceType_t gDeviceType = U_DEVICE_TYPE_SHORT_RANGE;
 static const uNetworkCfgBle_t gNetworkCfg = {
@@ -32,8 +52,10 @@ static uint16_t gCharHandle = -1;
 static int32_t gSpsChannel = -1;
 static int32_t gMtuSize = 0;
 static uDeviceHandle_t gDeviceHandle;
-static uPortSemaphoreHandle_t gTxSem;
+static uPortQueueHandle_t gKeyQueueHandle;
+//static uPortSemaphoreHandle_t gTxSem;
 
+static uint8_t convertToDoomKey(uint8_t receivedKey);
 
 static void connectionCallback(int32_t connHandle, char *address, int32_t status,
                                int32_t channel, int32_t mtu, void *pParameters)
@@ -57,14 +79,18 @@ static void connectionCallback(int32_t connHandle, char *address, int32_t status
 
 static void dataAvailableCallback(int32_t channel, void *pParameters)
 {
-    char buffer[SINGLE_PACKET_SIZE] = {0};
+    uint8_t buffer[SINGLE_PACKET_SIZE + 1] = {0};
     uDeviceHandle_t *pDeviceHandle = (uDeviceHandle_t *)pParameters;
-    int32_t length = uBleSpsReceive(*pDeviceHandle, channel, buffer, sizeof(buffer) - 1);
+    int32_t length = uBleSpsReceive(*pDeviceHandle, channel, (char *)buffer, sizeof(buffer) - 1);
 
     printf("dataAvailableCallback\n");
-    if (length >= 2) {
-        printf("Received data: %.2X %.2X\n", buffer[0], buffer[1]);
-        uPortSemaphoreGive(gTxSem);
+    if (length >= 4 && buffer[0] == gButtonFrameHeader[0] && buffer[1] == gButtonFrameHeader[1]) {
+        uKeyData_t keyData = {.isPressed = buffer[2], .key = convertToDoomKey(buffer[3])};
+        uPortQueueSend(gKeyQueueHandle, &keyData);
+        printf("Key pressed: %u, value: %u\n", buffer[2], buffer[3]);
+        //uPortSemaphoreGive(gTxSem);
+    } else {
+        printf("Woops... length: %d, buffer[0] = %02X, buffer[1] = %02X\n", length, buffer[0], buffer[1]);
     }
 }
 
@@ -110,24 +136,70 @@ static void prepareImageBuffer(uint8_t *pImageBuffer, uint32_t bufferSize) {
     }
 }
 
+static uint8_t convertToDoomKey(uint8_t receivedKey)
+{
+    uint8_t key;
+
+    switch (receivedKey) {
+    case ENTER_KEY:
+        key = KEY_ENTER;
+        break;
+    case LEFT_KEY:
+        key = KEY_LEFTARROW;
+        break;
+    case RIGHT_KEY:
+        key = KEY_RIGHTARROW;
+        break;
+    case UP_KEY:
+        key = KEY_UPARROW;
+        break;
+    case DOWN_KEY:
+        key = KEY_DOWNARROW;
+        break;
+    case CTRL_KEY:
+        key = KEY_FIRE;
+        break;
+    case SPACE_KEY:
+        key = KEY_USE;
+        break;
+    case ESCAPE_KEY:
+        key = KEY_ESCAPE;
+        break;
+    default:
+        key = 0xFF;
+        break;
+    }
+    
+    return key;
+}
+
 void DG_Init()
 {
+    int32_t errorCode;
     // Remove the line below if you want the log printouts from ubxlib
     //uPortLogOff();
+
     // Initiate ubxlib
     uPortInit();
     uDeviceInit();
+    
     // And the U-blox module
-    int32_t errorCode = uPortSemaphoreCreate(&gTxSem, 0, 1);
+    // errorCode = uPortSemaphoreCreate(&gTxSem, 0, 1);
+    // if (errorCode != 0) { 
+    //     printf("Failed to create semaphore: %d\n", errorCode);
+    // }
 
+    errorCode = uPortQueueCreate(KEY_QUEUE_SIZE, sizeof(uKeyData_t), &gKeyQueueHandle);
     if (errorCode != 0) { 
-        printf("Failed to create semaphore: %d\n", errorCode);
+        printf("Failed to create queue: %d\n", errorCode);
     }
 
-    uDeviceGetDefaults(gDeviceType, &gDeviceCfg);
-    gDeviceCfg.deviceCfg.cfgSho.moduleType = U_SHORT_RANGE_MODULE_TYPE_NINA_W15;
-    printf("\nInitiating the module...\n");
-    errorCode = uDeviceOpen(&gDeviceCfg, &gDeviceHandle);
+    if (errorCode == 0) {
+        uDeviceGetDefaults(gDeviceType, &gDeviceCfg);
+        gDeviceCfg.deviceCfg.cfgSho.moduleType = U_SHORT_RANGE_MODULE_TYPE_NINA_W15;
+        printf("\nInitiating the module...\n");
+        errorCode = uDeviceOpen(&gDeviceCfg, &gDeviceHandle);
+    }
 
     if (errorCode == 0) {
         printf("Bringing up the BLE network...\n");
@@ -216,8 +288,17 @@ uint32_t DG_GetTicksMs()
 
 int DG_GetKey(int* pressed, unsigned char* doomKey)
 {
-    // TODO
-    return 0;
+    int hasKey = 0;
+
+    if (uPortQueueGetFree(gKeyQueueHandle) < KEY_QUEUE_SIZE) {
+        uKeyData_t keyData;
+        uPortQueueReceive(gKeyQueueHandle, &keyData);
+        *pressed = (int)keyData.isPressed;
+        *doomKey = (unsigned char)keyData.key;
+        hasKey = 1;
+    }
+
+    return hasKey;
 }
 
 void DG_SetWindowTitle(const char * title)
