@@ -68,6 +68,16 @@
 
         const IMAGE_WIDTH = 320;
         const IMAGE_HEIGTH = 200;
+        let keysState = {
+            38: false,
+            40: false,
+            37: false,
+            39: false,
+            17: false,
+            13: false,
+            32: false,
+            27: false
+        };
     
         const DoomPanel = (() => {
             const CANVAS_ID = 'video-canvas';
@@ -260,10 +270,19 @@
             const disconnect = async () => {
                 await device.gatt.disconnect();
             }
+
+            const sendKey = async (keyData) => {
+                try {
+                    spsCharacteristic.writeValue(keyData);
+                } catch (err) {
+                    // no need to anything, it can trigger if keys are pressed before connection
+                }
+            }
     
             return {
                 scan,
-                disconnect
+                disconnect,
+                sendKey
             }
         })();
     
@@ -276,21 +295,33 @@
         // register key listener
         document.onkeydown = (e) => {
             e = e || window.event;
-    
-            if (e.keyCode === 38) {
-                console.log('↑');
-            } else if (e.keyCode === 40) {
-                console.log('↓');
-            } else if (e.keyCode === 37) {
-                console.log('←');
-            } else if (e.keyCode === 39) {
-                console.log('→');
-            } else if (e.ctrlKey) {
-                console.log('Ctrl');
-            } else if (e.keyCode === 13) {
-                console.log('Enter');
+
+            if (e.keyCode in keysState && keysState[e.keyCode] === false) {
+                console.log('Pressed: ' + e.keyCode);
+                const pressedKey = new Uint8Array([0xAB, 0xCD, 0x01, e.keyCode]);
+                try {
+                    BLEManager.sendKey(pressedKey);
+                } catch (err) {
+                    console.warn(err);
+                }
+                keysState[e.keyCode] = true;
             }
-        };
+        }
+
+        document.onkeyup = (e) => {
+            e = e || window.event;
+
+            if (e.keyCode in keysState) {
+                console.log('Unpressed: ' + e.keyCode);
+                const unpressedKey = new Uint8Array([0xAB, 0xCD, 0x00, e.keyCode]);
+                try {
+                    BLEManager.sendKey(unpressedKey);
+                } catch (err) {
+                    console.warn(err);
+                }
+                keysState[e.keyCode] = false;
+            }
+        }
     
     </script>
 </body>
