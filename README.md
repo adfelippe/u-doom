@@ -45,9 +45,9 @@ user@~/workspace/u-doom/doom-port-linux/build $ make -j
 Well, here you're on your own, but the process is similar to Linux, except that you call `msbuild` instead of `make` and point to an sln project file created by CMake. It should work if you're lucky enough. :)
 
 ### Running the port
-The binary to execute is called `u-doom-xplr-iot-app`. In order to actually make Doom run properly, you need to pass a WAD file (where Doom stores all the game data) using the `-iwad` option. Since I added the shareware WAD file for easy testing, this should do:
+The binary to execute is called `u-doom. In order to actually make Doom run properly, you need to pass a WAD file (where Doom stores all the game data) using the `-iwad` option. Since I added the shareware WAD file for easy testing, this should do:
 ```shell
-user@~/workspace/u-doom/doom-port-linux/build $ ./u-doom-xplr-iot-app -iwad ../../components/doomgeneric/wad/doom1.wad
+user@~/workspace/u-doom/doom-port-linux/build $ ./u-doom -iwad ../../components/doomgeneric/wad/doom1.wad
 ```
 
 ### Running the Web Bluetooth Application
