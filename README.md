@@ -6,7 +6,7 @@ As a proof of concept, the project provides a simple web page that uses the nati
 The port was done for both Windows and Linux.
 
 ## Doom port
-I chose the [doomgeneric](https://github.com/adfelippe/doomgeneric) variant to port here since it's one of the easiest port out there, with only 5 functions to be ported, which fits perfectly with ubxlib. These are the functions that must be ported:
+I chose the [doomgeneric](https://github.com/adfelippe/doomgeneric) variant to port here since it's one of the easiest ones out there, with only 5 functions to be ported, which fits perfectly with ubxlib. These are the functions that must be ported:
 * DG_Init
 * DG_DrawFrame
 * DG_SleepMs
@@ -23,13 +23,13 @@ This is how each one of them work in this port:
 |DG_GetTicksMs        |Platform-specific get system tick in ms.
 |DG_GetKey            |Read keys from a queue received from the remote Web BLE app
 
-Please notice I've forked the project in order to organize it a little bit and reduce the screen resolution to 320x200 to minimize the amount of data to be sent via BLE. I fixed most the compilation warnings and added the shareware WAD file to it too.
+Please notice I forked the project in order to organize it a little bit and reduce the screen resolution to 320x200 to minimize the amount of data to be sent via BLE. Most of the compilation warnings were fixed and the shareware WAD file was added.
 
 ## EVK-NINA-W15
-The EVK is controlled by ubxlib. It's configured with BLE SPS profile and a serial port at a 961200 bps. Please see the disclaimer below for the consequences of those.
+The EVK is controlled by ubxlib. It's configured with BLE SPS and the serial port runs at 961200 bps. Please see the disclaimer below for the implications of those.
 
 ## Web Bluetooth Application
-The Web Bluetooth component is a JavaScript application (sort of) running natively in the browser. Using the native Web Bluetooth API, we can connect to the NINA-EVK using any of the computer's Bluetooth device. Once the connection is established, the EVK will start sending frames, which the application will reconstruct based on a simple protocol. Once a full frame is received, it'll display the image in the browser on a 2D canvas. The application also captures the pressed/unpressed keys and send them back to the EVK so the game can respond to those events. Only up, down, left, right, ctrl, enter and esc are mapped at the moment.
+The Web Bluetooth component is a JavaScript application (sort of) running natively in the browser. Using the native Web Bluetooth API, we can connect to the NINA-EVK using any of the computer's Bluetooth device. Once the connection is established, the EVK will start sending chopped frames, which the application will then reconstruct based on a simple protocol. Once a full frame is received, it'll display the image in the browser on a 2D canvas. The application also captures the pressed/unpressed keys and send them back to the EVK so the game can respond to those events. Only up, down, left, right, ctrl, enter and esc are mapped at the moment.
 
 ## How to compile and run
 ### Compile the port for Linux
@@ -42,7 +42,7 @@ user@~/workspace/u-doom/doom-port-linux/build $ make -j
 ```
 
 ### Compile the port for Windows
-Well, here you're on your own, but the process is similar to Linux, except that you call `msbuild` instead of `make` and point to .sln project file created by CMake. It should work if you're lucky enough. :)
+Well, here you're on your own, but the process is similar to Linux, except that you call `msbuild` instead of `make` and point to an sln project file created by CMake. It should work if you're lucky enough. :)
 
 ### Running the port
 The binary to execute is called `u-doom-xplr-iot-app`. In order to actually make Doom run properly, you need to pass a WAD file (where Doom stores all the game data) using the `-iwad` option. Since I added the shareware WAD file for easy testing, this should do:
@@ -51,14 +51,14 @@ user@~/workspace/u-doom/doom-port-linux/build $ ./u-doom-xplr-iot-app -iwad ../.
 ```
 
 ### Running the Web Bluetooth Application
-As I said, the Web app is sort of native. It can run natively and just opening the index.html from the web-ble folder will work, but if you want a fancier panel with colored buttons, you'll have to install and run node.js. From inside the same folder, `npm install` and `npm start` will do the job if node is installed. Then you access it on http://localhost:3000/.
+As I said, the Web app is sort of native. It can run natively and just opening the index.html from the web-ble folder will work, but if you want a fancy panel with colored buttons, you'll have to install and run node.js. From inside the same folder, `npm install` and `npm start` will do the job if node is installed. Then you access it on http://localhost:3000/.
 
 ## Disclaimer
-This project was done for fun and to be presented at an internal embedded software conference at u-blox, therefore it's not meant to be playable in any way. The result is surprinsingly nice though given BLE limitations. On the transmission side, it was possible to reach 5 FPS, which will be very much playable, but for some reason I couldn't debug, the Web Bluetooth API drops most of the packets at that rate. As a workaround, each BLE packet has an 8 ms delay, causing the frame rate to drop to about 1 FPS.
+This project was done for fun and to be presented at an internal embedded software conference at u-blox, therefore it's not meant to be playable in any way. The result is good enough given BLE limitations. On the transmission side, it was possible to reach 5 FPS, which would be very much playable, but for some reason I couldn't debug in time, the Web Bluetooth API drops most of the packets at that rate. As a workaround, each BLE packet is transmitted with an 8 ms delay, causing the frame rate to drop to about 1 FPS.
 
 ## TO-DO
 If anyone (or myself) wants to play around or fix things, these can be done:
 * Investigate packet drop on Web App's side. All packets are received correctly by the PC's BLE device, but the API seems to have issues to consume all of them at fast rates. Maybe some queue getting full?
 * Add all Doom keys (IDDQD and IDKFA would be nice to have).
 * Squeeze out maximum performance on ubxlib's side.
-* Some code clean up can 
+* Some code clean up
