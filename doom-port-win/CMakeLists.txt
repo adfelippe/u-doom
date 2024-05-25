@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-set(APP_NAME u-doom-xplr-iot-app)
+set(APP_NAME u-doom)
 project(${APP_NAME})
 string(TOLOWER  ${CMAKE_SYSTEM_NAME} OS_NAME)
 set(DOOMGENERIC_DIR ../components/doomgeneric/doomgeneric)
