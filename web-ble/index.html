@@ -304,10 +304,10 @@
                 const pressedKey = new Uint8Array([0xAB, 0xCD, 0x01, e.keyCode]);
                 try {
                     BLEManager.sendKey(pressedKey);
+                    keysState[e.keyCode] = true;
                 } catch (err) {
                     console.warn(err);
                 }
-                keysState[e.keyCode] = true;
             }
         }
 
@@ -319,10 +319,10 @@
                 const unpressedKey = new Uint8Array([0xAB, 0xCD, 0x00, e.keyCode]);
                 try {
                     BLEManager.sendKey(unpressedKey);
+                    keysState[e.keyCode] = false;
                 } catch (err) {
                     console.warn(err);
                 }
-                keysState[e.keyCode] = false;
             }
         }
     
