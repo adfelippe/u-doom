@@ -54,7 +54,7 @@ user@~/workspace/u-doom/doom-port-linux/build $ ./u-doom -iwad ../../components/
 As I said, the Web app is sort of native. It can run natively and just opening the index.html from the web-ble folder will work, but if you want a fancy panel with colored buttons, you'll have to install and run node.js. From inside the same folder, `npm install` and `npm start` will do the job if node is installed. Then you access it on http://localhost:3000/.
 
 ## Disclaimer
-This project was done for fun and to be presented at an internal embedded software conference at u-blox, therefore it's not meant to be playable in any way. The result is good enough given BLE limitations. On the transmission side, it was possible to reach 5 FPS, which would be very much playable, but for some reason I couldn't debug in time, the Web Bluetooth API drops most of the packets at that rate. As a workaround, each BLE packet is transmitted with an 8 ms delay, causing the frame rate to drop to about 1 FPS.
+This project was done for fun and to be presented at an internal embedded software conference at u-blox, therefore it's not meant to be playable in any way. The result is good enough given BLE limitations. On the transmission side, it was possible to reach 5 FPS, which would be very much playable, but for some reason I couldn't debug in time, the Web Bluetooth API drops most of the packets at that rate. As a workaround, each BLE packet is transmitted with an 3 ms delay, causing the frame rate to drop to maximum 3 FPS. It's still playable though.
 
 ## TO-DO
 If anyone (or myself) wants to play around or fix things, these can be done:

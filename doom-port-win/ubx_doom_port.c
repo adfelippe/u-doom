@@ -14,7 +14,7 @@
 #define SINGLE_PACKET_SIZE      244
 #define SEMAPHORE_TIMEOUT_MS    1000
 #define TX_SLEEP_MS             1
-#define TX_SLEEP_US             8000
+#define TX_SLEEP_US             3000
 #define KEY_QUEUE_SIZE          100
 
 enum { 
