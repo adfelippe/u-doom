@@ -12,7 +12,7 @@
 #define DOOM_FRAME_SIZE         (DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4)
 #define SINGLE_PACKET_SIZE      244
 #define TX_SLEEP_MS             1
-#define TX_SLEEP_US             8000
+#define TX_SLEEP_US             3000
 #define KEY_QUEUE_SIZE          100
 
 enum { 
