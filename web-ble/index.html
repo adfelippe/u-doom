@@ -155,14 +155,13 @@
         })();
     
         const ImageProcessor = (() => {
-            const SizeOfUint32 = 4;
-            const imageByteArray = new Uint8Array(IMAGE_WIDTH * IMAGE_HEIGTH * SizeOfUint32);
             const startOfFrame = new Uint8Array([0xCA, 0xFE, 0xBA, 0xBE]);
             const endOfFrame = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
             const ackFrame = new ArrayBuffer([0xBE, 0xEF]);
     
             let frameOffset = 0;
             let receivingFrameSize = 0;
+            let imageByteArray;
     
             const compareArray4Bytes = (a1, a2) => {
                 if (a1.getUint8(0) === a2[0] &&
@@ -179,6 +178,7 @@
                 // Check for SOF
                 if (bufferLength === 8 && compareArray4Bytes(value, startOfFrame)) {
                     receivingFrameSize = value.getUint32(4);
+                    imageByteArray = new Uint8Array(receivingFrameSize);
                     //console.log('startOfFrame, receivingFrameSize = ', receivingFrameSize);
                     // Resync just in case
                     frameOffset = 0;
