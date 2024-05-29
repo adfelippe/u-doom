@@ -1,7 +1,7 @@
 # u-doom
 u-doom is a Doom port to u-blox's [ubxlib](https://github.com/u-blox/ubxlib). It was just a playground to test the Web Bluetooth API features and have fun with BLE. It shows how easy it is to use ubxlib even to port Doom for it.
 
-As a proof of concept, the project provides a simple web page that uses the native JavaScript Web Bluetooth API to connect to an [EVK-NINA-W15](https://www.u-blox.com/en/product/evk-nina-w15). The EVK is actually configured and controlled by our Doom port, which instead of sending the game frames to a video driver, it transmits it via BLE. Everything is done using ubxlib.
+As a proof of concept, the project provides a simple web page that uses the native JavaScript Web Bluetooth API to connect to an [EVK-NINA-W15](https://www.u-blox.com/en/product/evk-nina-w15). The EVK is actually configured and controlled by our Doom port, which instead of sending the game frames to a video driver, transmits them via BLE. Everything is done using ubxlib.
 
 The port was done for both Windows and Linux.
 
@@ -45,7 +45,7 @@ user@~/workspace/u-doom/doom-port-linux/build $ make -j
 Well, here you're on your own, but the process is similar to Linux, except that you call `msbuild` instead of `make` and point to an sln project file created by CMake. It should work if you're lucky enough. :)
 
 ### Running the port
-The binary to execute is called `u-doom. In order to actually make Doom run properly, you need to pass a WAD file (where Doom stores all the game data) using the `-iwad` option. Since I added the shareware WAD file for easy testing, this should do:
+The binary to execute is called `u-doom`. In order to actually make Doom run properly, you need to pass a WAD file (where Doom stores all the game data) using the `-iwad` option. Since I added the shareware WAD file for easy testing, this should do:
 ```shell
 user@~/workspace/u-doom/doom-port-linux/build $ ./u-doom -iwad ../../components/doomgeneric/wad/doom1.wad
 ```
